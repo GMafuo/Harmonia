@@ -1,8 +1,9 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus, StreamType } = require('@discordjs/voice');
 const play = require('play-dl');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const SpotifyWebApi = require('spotify-web-api-node');
+const fs = require('fs');
 
 // Initialiser l'API Spotify
 const spotifyApi = new SpotifyWebApi({
@@ -28,6 +29,39 @@ const searchCache = new Map();
 
 // Map pour stocker les processus yt-dlp en préchargement
 const preloadingProcesses = new Map();
+
+// Fonction pour trouver le chemin de yt-dlp
+function findYtDlpPath() {
+    if (process.platform === 'win32') {
+        return process.env.LOCALAPPDATA + '\\Microsoft\\WinGet\\Packages\\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\\yt-dlp.exe';
+    }
+    
+    // Sur Linux, essayer plusieurs chemins
+    const possiblePaths = [
+        'yt-dlp', // Dans le PATH (si installé via pip)
+        process.env.HOME + '/.local/bin/yt-dlp',
+        '/usr/local/bin/yt-dlp',
+        '/usr/bin/yt-dlp'
+    ];
+    
+    for (const path of possiblePaths) {
+        try {
+            if (path === 'yt-dlp') {
+                // Vérifier si yt-dlp est dans le PATH
+                execSync('which yt-dlp', { stdio: 'ignore' });
+                return 'yt-dlp';
+            } else if (fs.existsSync(path)) {
+                return path;
+            }
+        } catch (error) {
+            // Continuer à chercher
+        }
+    }
+    
+    // Si aucun chemin trouvé, retourner 'yt-dlp' et laisser le système le gérer
+    console.warn('⚠️ yt-dlp non trouvé, utilisation du PATH par défaut');
+    return 'yt-dlp';
+}
 
 // Variable pour stocker le token Spotify
 let spotifyAccessToken = null;
@@ -215,10 +249,7 @@ async function preloadNextSong(guildId) {
     console.log('Préchargement de:', nextSong.title);
     
     try {
-        // Détecter le chemin de yt-dlp selon l'OS
-        const ytdlpPath = process.platform === 'win32' 
-            ? process.env.LOCALAPPDATA + '\\Microsoft\\WinGet\\Packages\\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\\yt-dlp.exe'
-            : (process.env.HOME + '/.local/bin/yt-dlp'); // Sur Linux (Render)
+        const ytdlpPath = findYtDlpPath();
         
         // Lancer yt-dlp en arrière-plan pour mettre en cache
         const ytdlpProcess = spawn(ytdlpPath, [
@@ -280,10 +311,8 @@ async function playNext(guildId, voiceChannel, textChannel) {
             preloadingProcesses.delete(guildId);
         }
         
-        // Détecter le chemin de yt-dlp selon l'OS
-        const ytdlpPath = process.platform === 'win32' 
-            ? process.env.LOCALAPPDATA + '\\Microsoft\\WinGet\\Packages\\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\\yt-dlp.exe'
-            : (process.env.HOME + '/.local/bin/yt-dlp'); // Sur Linux (Render)
+        const ytdlpPath = findYtDlpPath();
+        console.log('📂 Utilisation de yt-dlp:', ytdlpPath);
         
         const ytdlpProcess = spawn(ytdlpPath, [
             '-f', 'bestaudio',
@@ -294,7 +323,12 @@ async function playNext(guildId, voiceChannel, textChannel) {
         ]);
 
         ytdlpProcess.on('error', (error) => {
-            console.error('Erreur yt-dlp:', error);
+            console.error('❌ Erreur yt-dlp:', error.message);
+            if (error.code === 'ENOENT') {
+                console.error('💡 yt-dlp n\'est pas installé. Vérifiez que le script install-yt-dlp.sh s\'est exécuté correctement.');
+                textChannel.send('❌ Erreur: yt-dlp n\'est pas installé sur le serveur. Veuillez contacter l\'administrateur.');
+            }
+            // Essayer la chanson suivante
             playNext(guildId, voiceChannel, textChannel);
         });
 
