@@ -315,9 +315,14 @@ async function playNext(guildId, voiceChannel, textChannel) {
         console.log('📂 Utilisation de yt-dlp:', ytdlpPath);
         
         const ytdlpProcess = spawn(ytdlpPath, [
-            '-f', 'bestaudio',
+            '-f', 'bestaudio[ext=m4a]/bestaudio/best',
             '--no-playlist',
-            '--buffer-size', '16K', // Buffer plus petit pour démarrage rapide
+            '--extractor-args', 'youtube:player_client=android,web',
+            '--no-check-certificates',
+            '--geo-bypass',
+            '--buffer-size', '16K',
+            '--retries', '3',
+            '--fragment-retries', '3',
             '-o', '-',
             nextSong.url
         ]);
@@ -334,10 +339,30 @@ async function playNext(guildId, voiceChannel, textChannel) {
             playNext(guildId, voiceChannel, textChannel);
         });
 
+        let hasData = false;
+        let errorOutput = '';
+
         ytdlpProcess.stderr.on('data', (data) => {
             const msg = data.toString();
-            if (msg.includes('ERROR')) {
+            errorOutput += msg;
+            if (msg.includes('ERROR') || msg.includes('fragment not found')) {
                 console.log('yt-dlp:', msg.trim());
+            }
+        });
+
+        ytdlpProcess.stdout.on('data', () => {
+            hasData = true;
+        });
+
+        ytdlpProcess.on('close', (code) => {
+            if (code !== 0 && !hasData) {
+                console.error(`❌ yt-dlp s'est terminé avec le code ${code}`);
+                if (errorOutput.includes('fragment not found') || errorOutput.includes('empty')) {
+                    console.log('⚠️ Erreur de téléchargement YouTube, passage à la chanson suivante...');
+                    textChannel.send(`⚠️ Impossible de lire **${nextSong.title}**, passage à la suivante...`)
+                        .catch(err => console.error('Erreur envoi message:', err.message));
+                }
+                playNext(guildId, voiceChannel, textChannel);
             }
         });
 
