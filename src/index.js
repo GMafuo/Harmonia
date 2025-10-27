@@ -1,15 +1,7 @@
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const play = require('play-dl');
 require('dotenv').config();
-
-// Configure play-dl avant tout
-play.setToken({
-    youtube: {
-        cookie: process.env.YOUTUBE_COOKIE
-    }
-});
 
 const client = new Client({
     intents: [
@@ -44,20 +36,18 @@ client.on('interactionCreate', async interaction => {
     try {
         await command.execute(interaction);
     } catch (error) {
-        console.error(error);
+        console.error('Erreur lors de l\'exécution de la commande:', error);
+        
+        const errorMessage = '❌ Une erreur est survenue !';
+        
         try {
-            const errorMessage = { 
-                content: 'Une erreur est survenue !', 
-                ephemeral: true 
-            };
-
-            if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply(errorMessage);
-            } else {
+            if (interaction.deferred && !interaction.replied) {
                 await interaction.editReply(errorMessage);
+            } else if (!interaction.replied) {
+                await interaction.reply({ content: errorMessage, flags: [4096] });
             }
-        } catch (err) {
-            console.error('Erreur lors de la réponse à l\'interaction:', err);
+        } catch (e) {
+            console.error('Impossible de répondre à l\'interaction:', e);
         }
     }
 });
@@ -66,7 +56,7 @@ client.once('ready', () => {
     console.log(`🎵 Harmonia est en ligne en tant que ${client.user.tag}`);
 });
 
-// Gestion des erreurs
+// Gestion des erreurs non gérées
 process.on('unhandledRejection', error => {
     console.error('Erreur non gérée:', error);
 });

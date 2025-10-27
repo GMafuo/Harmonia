@@ -1,0 +1,11 @@
+{
+    "client_id": "8a8ae2607df04de08c9e250d3df41503",
+    "client_secret": "dc97b4cbec7c466a9f54c557f8bda22e",
+    "redirect_url": "http://localhost",
+    "access_token": "BQBPVjyaanQjNWgMS35Ptmq8_vs7UJmcAmVaqXimMhAg5EOyTxABokACdfNJHz0cLFG086LNjfHjtZRvu16LSGP4d5bnDdUvF0HL5GjsOavRDmMWmZeb81L7jjSJPWFp7b7RlXZw4636rPisEvalRcmJ_acJNZGbU7x-DVctxikft8XyeddQt8Mu4SZBylKYgqutHdmhmDJdqQ",
+    "refresh_token": "AQBG0ViDCO4WdM6KTFNWaAgyYgO3f5KPvF-LX8sFlKM1BqsOZshvBCsMFRRxomv7cFhKYdHmRtToYe41zZlqMQr7Vt5NK9WU5REXaNS659VBGn5Xs6s-3I-BzlxwY25C6r4",
+    "expires_in": 3600,
+    "expiry": 1740490286435,
+    "token_type": "Bearer",
+    "market": "FR"
+}
