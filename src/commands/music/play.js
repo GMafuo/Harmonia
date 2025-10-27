@@ -315,7 +315,9 @@ async function playNext(guildId, voiceChannel, textChannel) {
         console.log('📂 Utilisation de yt-dlp:', ytdlpPath);
         
         const ytdlpProcess = spawn(ytdlpPath, [
-            '-f', 'bestaudio[ext=m4a]/bestaudio/best',
+            '-f', 'bestaudio/best',
+            '--extract-audio',
+            '--audio-format', 'best',
             '--no-playlist',
             '--extractor-args', 'youtube:player_client=android,web',
             '--no-check-certificates',
