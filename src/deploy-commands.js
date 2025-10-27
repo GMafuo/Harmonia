@@ -1,36 +1,31 @@
 const { REST, Routes } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
-const commands = [
-    {
-        name: 'play',
-        description: 'Joue une musique depuis YouTube',
-        options: [{
-            name: 'recherche',
-            description: 'Lien YouTube ou terme de recherche',
-            type: 3, // 3 = STRING
-            required: true
-        }]
-    },
-    {
-        name: 'pause',
-        description: 'Met en pause la musique en cours'
-    },
-    {
-        name: 'resume',
-        description: 'Reprend la lecture de la musique'
-    },
-    {
-        name: 'skip',
-        description: 'Passe à la musique suivante'
+const commands = [];
+
+// Charger toutes les commandes depuis le dossier commands/music
+const commandsPath = path.join(__dirname, 'commands', 'music');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+
+for (const file of commandFiles) {
+    const filePath = path.join(commandsPath, file);
+    const command = require(filePath);
+    
+    if ('data' in command && 'execute' in command) {
+        commands.push(command.data.toJSON());
+        console.log(`Chargé: ${command.data.name}`);
+    } else {
+        console.log(`[ATTENTION] La commande ${filePath} n'a pas les propriétés "data" ou "execute" requises.`);
     }
-];
+}
 
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
 (async () => {
     try {
-        console.log('Début de l\'enregistrement des commandes...');
+        console.log(`Début de l'enregistrement de ${commands.length} commandes...`);
 
         await rest.put(
             Routes.applicationCommands(process.env.CLIENT_ID),
