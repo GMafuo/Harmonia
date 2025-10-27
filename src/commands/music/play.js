@@ -20,6 +20,9 @@ const queues = new Map();
 // Map pour stocker les connexions vocales
 const connections = new Map();
 
+// Map pour stocker la chanson en cours de lecture par guild
+const currentSongs = new Map();
+
 // Cache pour les recherches YouTube (pour éviter de rechercher 2x la même chose)
 const searchCache = new Map();
 
@@ -164,6 +167,11 @@ function getQueue(guildId) {
     return queues.get(guildId);
 }
 
+// Fonction pour récupérer la chanson en cours
+function getCurrentSong(guildId) {
+    return currentSongs.get(guildId);
+}
+
 // Fonction pour rechercher une vidéo YouTube avec cache
 async function searchYouTube(query) {
     // Vérifier le cache
@@ -237,6 +245,8 @@ async function playNext(guildId, voiceChannel, textChannel) {
     
     if (!queue || queue.length === 0) {
         console.log('File d\'attente vide, fin de lecture');
+        // Supprimer la chanson en cours
+        currentSongs.delete(guildId);
         // Quitter le canal vocal après 1 minute d'inactivité
         setTimeout(() => {
             const currentQueue = queues.get(guildId);
@@ -256,6 +266,9 @@ async function playNext(guildId, voiceChannel, textChannel) {
     
     const nextSong = queue.shift();
     console.log('Lecture de la prochaine chanson:', nextSong.title);
+    
+    // Sauvegarder la chanson en cours
+    currentSongs.set(guildId, nextSong);
     
     try {
         // Annuler le préchargement si en cours
@@ -567,5 +580,6 @@ module.exports = {
     // Exporter les fonctions pour accéder au player et à la queue
     getPlayer,
     getQueue,
+    getCurrentSong,
     playNext
 };
