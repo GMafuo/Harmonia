@@ -326,7 +326,9 @@ async function playNext(guildId, voiceChannel, textChannel) {
             console.error('❌ Erreur yt-dlp:', error.message);
             if (error.code === 'ENOENT') {
                 console.error('💡 yt-dlp n\'est pas installé. Vérifiez que le script install-yt-dlp.sh s\'est exécuté correctement.');
-                textChannel.send('❌ Erreur: yt-dlp n\'est pas installé sur le serveur. Veuillez contacter l\'administrateur.');
+                // Essayer d'envoyer le message, ignorer si pas de permissions
+                textChannel.send('❌ Erreur: yt-dlp n\'est pas installé sur le serveur. Veuillez contacter l\'administrateur.')
+                    .catch(err => console.error('Impossible d\'envoyer le message d\'erreur:', err.message));
             }
             // Essayer la chanson suivante
             playNext(guildId, voiceChannel, textChannel);
