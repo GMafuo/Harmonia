@@ -218,7 +218,7 @@ async function preloadNextSong(guildId) {
         // Détecter le chemin de yt-dlp selon l'OS
         const ytdlpPath = process.platform === 'win32' 
             ? process.env.LOCALAPPDATA + '\\Microsoft\\WinGet\\Packages\\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\\yt-dlp.exe'
-            : 'yt-dlp'; // Sur Linux (Render), yt-dlp est dans le PATH
+            : (process.env.HOME + '/.local/bin/yt-dlp'); // Sur Linux (Render)
         
         // Lancer yt-dlp en arrière-plan pour mettre en cache
         const ytdlpProcess = spawn(ytdlpPath, [
@@ -283,7 +283,7 @@ async function playNext(guildId, voiceChannel, textChannel) {
         // Détecter le chemin de yt-dlp selon l'OS
         const ytdlpPath = process.platform === 'win32' 
             ? process.env.LOCALAPPDATA + '\\Microsoft\\WinGet\\Packages\\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\\yt-dlp.exe'
-            : 'yt-dlp'; // Sur Linux (Render), yt-dlp est dans le PATH
+            : (process.env.HOME + '/.local/bin/yt-dlp'); // Sur Linux (Render)
         
         const ytdlpProcess = spawn(ytdlpPath, [
             '-f', 'bestaudio',
