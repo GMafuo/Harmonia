@@ -1,7 +1,6 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-
-// Importer les fonctions depuis play.js
+const { SlashCommandBuilder } = require('discord.js');
 const playCommand = require('./play.js');
+const { createQueueEmbed, EMOJIS } = require('../../utils/embedStyles');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -11,22 +10,16 @@ module.exports = {
     async execute(interaction) {
         try {
             const queue = playCommand.getQueue(interaction.guildId);
+            const currentSong = playCommand.getCurrentSong(interaction.guildId);
             
-            if (!queue || queue.length === 0) {
+            if ((!queue || queue.length === 0) && !currentSong) {
                 return await interaction.reply({
                     content: '❌ La file d\'attente est vide !',
                     flags: [4096]
                 });
             }
 
-            const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setTitle('🎵 File d\'attente')
-                .setDescription(queue.map((song, index) => 
-                    `**${index + 1}.** ${song.title} - \`${song.duration}\` (Demandé par ${song.requester})`
-                ).join('\n'))
-                .setFooter({ text: `${queue.length} chanson(s) en attente` })
-                .setTimestamp();
+            const embed = createQueueEmbed(queue || [], currentSong);
 
             await interaction.reply({ embeds: [embed] });
         } catch (error) {

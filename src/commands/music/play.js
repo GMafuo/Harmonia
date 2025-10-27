@@ -4,6 +4,7 @@ const play = require('play-dl');
 const { spawn, execSync } = require('child_process');
 const SpotifyWebApi = require('spotify-web-api-node');
 const fs = require('fs');
+const { COLORS, EMOJIS, createEmbed } = require('../../utils/embedStyles');
 
 // Initialiser l'API Spotify
 const spotifyApi = new SpotifyWebApi({
@@ -417,9 +418,14 @@ async function playNext(guildId, voiceChannel, textChannel) {
         connection.subscribe(player);
         player.play(resource);
 
-        // Envoyer un message dans le canal texte (en parallèle, sans attendre)
+        // Envoyer un message stylisé dans le canal texte
         if (textChannel && textChannel.permissionsFor && textChannel.permissionsFor(textChannel.client.user)?.has(['ViewChannel', 'SendMessages'])) {
-            textChannel.send(`▶️ Lecture en cours : **${nextSong.title}** - \`${nextSong.duration}\``).catch(console.error);
+            const embed = createEmbed(
+                `${EMOJIS.nowPlaying} Lecture en cours`,
+                `**${nextSong.title}**\n\n${EMOJIS.music} Durée: \`${nextSong.duration}\`\n${EMOJIS.headphones} Demandé par: ${nextSong.requester}`,
+                COLORS.playing
+            );
+            textChannel.send({ embeds: [embed] }).catch(console.error);
         }
         
     } catch (error) {
@@ -626,13 +632,22 @@ module.exports = {
 
             // Ajouter la chanson à la queue
             queue.push(song);
-
             if (isPlaying) {
                 // Si une musique est déjà en cours, juste ajouter à la queue
-                await interaction.editReply(`✅ Ajouté à la file : **${song.title}** - \`${song.duration}\` (Position: ${queue.length})`);
+                const embed = createEmbed(
+                    `${EMOJIS.play} Ajouté à la file`,
+                    `**${song.title}**\n\n${EMOJIS.music} Durée: \`${song.duration}\`\n📍 Position: **${queue.length}**`,
+                    COLORS.secondary
+                );
+                await interaction.editReply({ embeds: [embed] });
             } else {
                 // Si rien n'est en cours, démarrer la lecture
-                await interaction.editReply(`🎵 Démarrage de la lecture...`);
+                const embed = createEmbed(
+                    `${EMOJIS.fire} Démarrage de la lecture`,
+                    `Harmonia va jouer **${song.title}** ${EMOJIS.sparkles}`,
+                    COLORS.playing
+                );
+                await interaction.editReply({ embeds: [embed] });
                 playNext(interaction.guildId, voiceChannel, interaction.channel);
             }
             

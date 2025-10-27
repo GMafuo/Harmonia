@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const playCommand = require('./play.js');
+const { createEmbed, COLORS, EMOJIS } = require('../../utils/embedStyles');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -28,7 +29,13 @@ module.exports = {
             // Vider la queue
             queue.length = 0;
 
-            await interaction.editReply(`🗑️ File d'attente vidée ! **${count}** chanson${count > 1 ? 's' : ''} supprimée${count > 1 ? 's' : ''}.`);
+            const embed = createEmbed(
+                `${EMOJIS.clear} File d'attente vidée`,
+                `**${count}** chanson${count > 1 ? 's' : ''} supprimée${count > 1 ? 's' : ''} avec succès.`,
+                COLORS.success
+            );
+
+            await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
             console.error('Erreur lors du clear:', error);

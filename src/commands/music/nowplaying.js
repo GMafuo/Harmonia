@@ -1,5 +1,6 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const playCommand = require('./play.js');
+const { createNowPlayingEmbed, EMOJIS } = require('../../utils/embedStyles');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -13,7 +14,7 @@ module.exports = {
             // Vérifier si l'utilisateur est dans un salon vocal
             const voiceChannel = interaction.member.voice.channel;
             if (!voiceChannel) {
-                return await interaction.editReply('❌ Tu dois être dans un salon vocal !');
+                return await interaction.editReply(`❌ Tu dois être dans un salon vocal !`);
             }
 
             // Récupérer le player et la chanson en cours
@@ -24,16 +25,8 @@ module.exports = {
                 return await interaction.editReply('❌ Aucune musique n\'est en cours de lecture !');
             }
 
-            // Créer un embed pour afficher la chanson
-            const embed = new EmbedBuilder()
-                .setColor('#0099ff')
-                .setTitle('🎵 Lecture en cours')
-                .setDescription(`**${currentSong.title}**`)
-                .addFields(
-                    { name: '⏱️ Durée', value: currentSong.duration, inline: true },
-                    { name: '👤 Demandé par', value: currentSong.requester, inline: true }
-                )
-                .setTimestamp();
+            // Créer l'embed avec le style Harmonia
+            const embed = createNowPlayingEmbed(currentSong);
 
             await interaction.editReply({ embeds: [embed] });
 

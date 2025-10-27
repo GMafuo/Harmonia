@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const playCommand = require('./play.js');
+const { createEmbed, COLORS, EMOJIS } = require('../../utils/embedStyles');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -33,7 +34,13 @@ module.exports = {
                 [queue[i], queue[j]] = [queue[j], queue[i]];
             }
 
-            await interaction.editReply(`🔀 File d'attente mélangée ! **${queue.length}** chanson${queue.length > 1 ? 's' : ''} dans un ordre aléatoire.`);
+            const embed = createEmbed(
+                `${EMOJIS.shuffle} File d'attente mélangée`,
+                `**${queue.length}** chanson${queue.length > 1 ? 's' : ''} mélangée${queue.length > 1 ? 's' : ''} dans un ordre aléatoire ${EMOJIS.sparkles}`,
+                COLORS.success
+            );
+
+            await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
             console.error('Erreur lors du shuffle:', error);
