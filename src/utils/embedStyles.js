@@ -33,12 +33,13 @@ module.exports = {
     // Template pour embed standard
     createEmbed(title, description, color = COLORS.primary) {
         const { EmbedBuilder } = require('discord.js');
+        const iconURL = 'https://imgur.com/FvV2kAy.png';
         return new EmbedBuilder()
             .setColor(color)
             .setTitle(title)
             .setDescription(description)
             .setTimestamp()
-            .setFooter({ text: 'Harmonia - The spirit of music', iconURL: 'https://i.imgur.com/AfFp7pu.png' });
+            .setFooter({ text: 'Harmonia - The spirit of music', iconURL: iconURL });
     },
     
     // Template pour now playing
@@ -46,14 +47,14 @@ module.exports = {
         const { EmbedBuilder } = require('discord.js');
         return new EmbedBuilder()
             .setColor(COLORS.playing)
-            .setAuthor({ name: 'Lecture en cours', iconURL: 'https://i.imgur.com/AfFp7pu.png' })
+            .setAuthor({ name: 'Lecture en cours', iconURL: iconURL })
             .setTitle(`${EMOJIS.nowPlaying} ${song.title}`)
             .addFields(
                 { name: `${EMOJIS.music} Durée`, value: `\`${song.duration}\``, inline: true },
                 { name: `${EMOJIS.headphones} Demandé par`, value: song.requester, inline: true }
             )
             .setTimestamp()
-            .setFooter({ text: 'Harmonia', iconURL: 'https://i.imgur.com/AfFp7pu.png' });
+            .setFooter({ text: 'Harmonia', iconURL: iconURL });
     },
     
     // Template pour la queue
@@ -61,7 +62,7 @@ module.exports = {
         const { EmbedBuilder } = require('discord.js');
         const embed = new EmbedBuilder()
             .setColor(COLORS.queue)
-            .setAuthor({ name: 'File d\'attente', iconURL: 'https://i.imgur.com/AfFp7pu.png' })
+            .setAuthor({ name: 'File d\'attente', iconURL: iconURL })
             .setTitle(`${EMOJIS.queue} Chansons en attente`);
         
         if (currentSong) {
@@ -94,7 +95,7 @@ module.exports = {
         
         embed.setFooter({ 
             text: `${queue.length} chanson(s) en attente • Harmonia`, 
-            iconURL: 'https://i.imgur.com/AfFp7pu.png' 
+            iconURL: iconURL
         })
         .setTimestamp();
         

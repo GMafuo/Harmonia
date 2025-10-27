@@ -1,74 +1,26 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus, StreamType } = require('@discordjs/voice');
 const play = require('play-dl');
-const { spawn, execSync } = require('child_process');
+const { spawn } = require('child_process');
 const SpotifyWebApi = require('spotify-web-api-node');
-const fs = require('fs');
 const { COLORS, EMOJIS, createEmbed } = require('../../utils/embedStyles');
 
-// Initialiser l'API Spotify
 const spotifyApi = new SpotifyWebApi({
     clientId: process.env.SPOTIFY_CLIENT_ID,
     clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
     refreshToken: process.env.SPOTIFY_REFRESH_TOKEN
 });
 
-// Map pour stocker les players par guild
 const players = new Map();
-
-// Map pour stocker les files d'attente par guild
 const queues = new Map();
-
-// Map pour stocker les connexions vocales
 const connections = new Map();
-
-// Map pour stocker la chanson en cours de lecture par guild
 const currentSongs = new Map();
-
-// Cache pour les recherches YouTube (pour éviter de rechercher 2x la même chose)
 const searchCache = new Map();
-
-// Map pour stocker les processus yt-dlp en préchargement
 const preloadingProcesses = new Map();
 
-// Fonction pour trouver le chemin de yt-dlp
-function findYtDlpPath() {
-    if (process.platform === 'win32') {
-        return process.env.LOCALAPPDATA + '\\Microsoft\\WinGet\\Packages\\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\\yt-dlp.exe';
-    }
-    
-    // Sur Linux, essayer plusieurs chemins
-    const possiblePaths = [
-        'yt-dlp', // Dans le PATH (si installé via pip)
-        process.env.HOME + '/.local/bin/yt-dlp',
-        '/usr/local/bin/yt-dlp',
-        '/usr/bin/yt-dlp'
-    ];
-    
-    for (const path of possiblePaths) {
-        try {
-            if (path === 'yt-dlp') {
-                // Vérifier si yt-dlp est dans le PATH
-                execSync('which yt-dlp', { stdio: 'ignore' });
-                return 'yt-dlp';
-            } else if (fs.existsSync(path)) {
-                return path;
-            }
-        } catch (error) {
-            // Continuer à chercher
-        }
-    }
-    
-    // Si aucun chemin trouvé, retourner 'yt-dlp' et laisser le système le gérer
-    console.warn('⚠️ yt-dlp non trouvé, utilisation du PATH par défaut');
-    return 'yt-dlp';
-}
-
-// Variable pour stocker le token Spotify
 let spotifyAccessToken = null;
 let spotifyTokenExpiry = null;
 
-// Fonction pour obtenir un token Spotify valide
 async function getSpotifyToken() {
     try {
         if (!spotifyAccessToken || !spotifyTokenExpiry || Date.now() >= spotifyTokenExpiry) {
@@ -86,7 +38,6 @@ async function getSpotifyToken() {
     }
 }
 
-// Fonction pour extraire l'ID et le type d'un lien Spotify
 function extractSpotifyInfo(url) {
     const trackMatch = url.match(/track\/([a-zA-Z0-9]+)/);
     if (trackMatch) {
@@ -106,7 +57,6 @@ function extractSpotifyInfo(url) {
     return null;
 }
 
-// Fonction pour récupérer les infos d'une track Spotify
 async function getSpotifyTrackInfo(trackId) {
     try {
         await getSpotifyToken();
@@ -125,11 +75,9 @@ async function getSpotifyTrackInfo(trackId) {
     }
 }
 
-// Fonction pour récupérer les tracks d'une playlist Spotify
 async function getSpotifyPlaylistTracks(playlistId) {
     try {
         await getSpotifyToken();
-        console.log('Tentative de récupération de la playlist:', playlistId);
         
         const tracks = [];
         let offset = 0;
@@ -138,8 +86,6 @@ async function getSpotifyPlaylistTracks(playlistId) {
         do {
             const data = await spotifyApi.getPlaylistTracks(playlistId, { offset, limit: 100 });
             total = data.body.total;
-            
-            console.log(`Récupération de ${data.body.items.length} tracks (offset: ${offset}/${total})`);
             
             for (const item of data.body.items) {
                 if (item.track && !item.track.is_local) {
@@ -155,12 +101,10 @@ async function getSpotifyPlaylistTracks(playlistId) {
             offset += 100;
         } while (offset < total);
         
-        console.log(`Total de tracks récupérées: ${tracks.length}`);
         return tracks;
     } catch (error) {
         console.error('Erreur lors de la récupération de la playlist Spotify:', error);
         
-        // Messages d'erreur plus explicites
         if (error.statusCode === 404) {
             throw new Error('Playlist introuvable. Assurez-vous que la playlist est publique.');
         } else if (error.statusCode === 401) {
@@ -173,7 +117,6 @@ async function getSpotifyPlaylistTracks(playlistId) {
     }
 }
 
-// Fonction pour récupérer les tracks d'un album Spotify
 async function getSpotifyAlbumTracks(albumId) {
     try {
         await getSpotifyToken();
@@ -192,35 +135,27 @@ async function getSpotifyAlbumTracks(albumId) {
     }
 }
 
-// Fonction pour récupérer un player
 function getPlayer(guildId) {
     return players.get(guildId);
 }
 
-// Fonction pour récupérer la queue
 function getQueue(guildId) {
     return queues.get(guildId);
 }
 
-// Fonction pour récupérer la chanson en cours
 function getCurrentSong(guildId) {
     return currentSongs.get(guildId);
 }
 
-// Fonction pour rechercher une vidéo YouTube avec cache
 async function searchYouTube(query) {
-    // Vérifier le cache
     if (searchCache.has(query)) {
-        console.log('Résultat en cache pour:', query);
         return searchCache.get(query);
     }
     
-    // Rechercher sur YouTube
     const searchResults = await play.search(query, { limit: 1 });
     
     if (searchResults && searchResults.length > 0) {
         const result = searchResults[0].url;
-        // Mettre en cache (garder seulement les 100 dernières recherches)
         if (searchCache.size > 100) {
             const firstKey = searchCache.keys().next().value;
             searchCache.delete(firstKey);
@@ -232,7 +167,6 @@ async function searchYouTube(query) {
     return null;
 }
 
-// Fonction pour précharger la prochaine chanson
 async function preloadNextSong(guildId) {
     const queue = queues.get(guildId);
     
@@ -240,9 +174,8 @@ async function preloadNextSong(guildId) {
         return;
     }
     
-    const nextSong = queue[0]; // Récupérer sans retirer de la queue
+    const nextSong = queue[0];
     
-    // Éviter de précharger si déjà en cours
     if (preloadingProcesses.has(guildId)) {
         return;
     }
@@ -250,14 +183,13 @@ async function preloadNextSong(guildId) {
     console.log('Préchargement de:', nextSong.title);
     
     try {
-        const ytdlpPath = findYtDlpPath();
+        const ytdlpPath = process.env.LOCALAPPDATA + '\\Microsoft\\WinGet\\Packages\\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\\yt-dlp.exe';
         
-        // Lancer yt-dlp en arrière-plan pour mettre en cache
         const ytdlpProcess = spawn(ytdlpPath, [
             '-f', 'bestaudio',
             '--no-playlist',
             '--quiet',
-            '--simulate', // Juste pour valider l'URL et mettre en cache
+            '--simulate',
             nextSong.url
         ]);
         
@@ -274,15 +206,11 @@ async function preloadNextSong(guildId) {
     }
 }
 
-// Fonction pour jouer la prochaine chanson
 async function playNext(guildId, voiceChannel, textChannel) {
     const queue = queues.get(guildId);
     
     if (!queue || queue.length === 0) {
-        console.log('File d\'attente vide, fin de lecture');
-        // Supprimer la chanson en cours
         currentSongs.delete(guildId);
-        // Quitter le canal vocal après 1 minute d'inactivité
         setTimeout(() => {
             const currentQueue = queues.get(guildId);
             if (!currentQueue || currentQueue.length === 0) {
@@ -300,78 +228,38 @@ async function playNext(guildId, voiceChannel, textChannel) {
     }
     
     const nextSong = queue.shift();
-    console.log('Lecture de la prochaine chanson:', nextSong.title);
-    
-    // Sauvegarder la chanson en cours
     currentSongs.set(guildId, nextSong);
     
     try {
-        // Annuler le préchargement si en cours
         if (preloadingProcesses.has(guildId)) {
             preloadingProcesses.get(guildId).kill();
             preloadingProcesses.delete(guildId);
         }
         
-        const ytdlpPath = findYtDlpPath();
-        console.log('📂 Utilisation de yt-dlp:', ytdlpPath);
+        const ytdlpPath = process.env.LOCALAPPDATA + '\\Microsoft\\WinGet\\Packages\\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\\yt-dlp.exe';
         
         const ytdlpProcess = spawn(ytdlpPath, [
-            '-f', 'bestaudio/best',
-            '--extract-audio',
-            '--audio-format', 'best',
+            '-f', 'bestaudio',
             '--no-playlist',
-            '--extractor-args', 'youtube:player_client=android,web',
-            '--no-check-certificates',
-            '--geo-bypass',
             '--buffer-size', '16K',
-            '--retries', '3',
-            '--fragment-retries', '3',
             '-o', '-',
             nextSong.url
         ]);
 
         ytdlpProcess.on('error', (error) => {
-            console.error('❌ Erreur yt-dlp:', error.message);
-            if (error.code === 'ENOENT') {
-                console.error('💡 yt-dlp n\'est pas installé. Vérifiez que le script install-yt-dlp.sh s\'est exécuté correctement.');
-                // Essayer d'envoyer le message, ignorer si pas de permissions
-                textChannel.send('❌ Erreur: yt-dlp n\'est pas installé sur le serveur. Veuillez contacter l\'administrateur.')
-                    .catch(err => console.error('Impossible d\'envoyer le message d\'erreur:', err.message));
-            }
-            // Essayer la chanson suivante
+            console.error('Erreur yt-dlp:', error);
             playNext(guildId, voiceChannel, textChannel);
         });
 
-        let hasData = false;
-        let errorOutput = '';
-
         ytdlpProcess.stderr.on('data', (data) => {
             const msg = data.toString();
-            errorOutput += msg;
-            if (msg.includes('ERROR') || msg.includes('fragment not found')) {
+            if (msg.includes('ERROR')) {
                 console.log('yt-dlp:', msg.trim());
-            }
-        });
-
-        ytdlpProcess.stdout.on('data', () => {
-            hasData = true;
-        });
-
-        ytdlpProcess.on('close', (code) => {
-            if (code !== 0 && !hasData) {
-                console.error(`❌ yt-dlp s'est terminé avec le code ${code}`);
-                if (errorOutput.includes('fragment not found') || errorOutput.includes('empty')) {
-                    console.log('⚠️ Erreur de téléchargement YouTube, passage à la chanson suivante...');
-                    textChannel.send(`⚠️ Impossible de lire **${nextSong.title}**, passage à la suivante...`)
-                        .catch(err => console.error('Erreur envoi message:', err.message));
-                }
-                playNext(guildId, voiceChannel, textChannel);
             }
         });
 
         const stream = ytdlpProcess.stdout;
         
-        // Réutiliser ou créer la connexion vocale
         let connection = connections.get(guildId);
         if (!connection) {
             const { joinVoiceChannel } = require('@discordjs/voice');
@@ -383,7 +271,6 @@ async function playNext(guildId, voiceChannel, textChannel) {
             connections.set(guildId, connection);
         }
 
-        // Créer ou récupérer le player
         let player = players.get(guildId);
         if (!player) {
             const { createAudioPlayer, AudioPlayerStatus } = require('@discordjs/voice');
@@ -391,14 +278,11 @@ async function playNext(guildId, voiceChannel, textChannel) {
             players.set(guildId, player);
             
             player.on(AudioPlayerStatus.Idle, () => {
-                console.log('Chanson terminée, prochaine...');
                 playNext(guildId, voiceChannel, textChannel);
             });
             
-            // Précharger la prochaine chanson quand on commence à jouer
             player.on(AudioPlayerStatus.Playing, () => {
-                console.log('Lecture démarrée, préchargement de la suivante...');
-                setTimeout(() => preloadNextSong(guildId), 5000); // Attendre 5s avant de précharger
+                setTimeout(() => preloadNextSong(guildId), 5000);
             });
 
             player.on('error', error => {
@@ -407,18 +291,15 @@ async function playNext(guildId, voiceChannel, textChannel) {
             });
         }
 
-        // Créer la ressource audio avec highWaterMark réduit pour démarrage rapide
         const { createAudioResource, StreamType } = require('@discordjs/voice');
         const resource = createAudioResource(stream, {
             inputType: StreamType.Arbitrary,
-            inlineVolume: true,
-            inlineVolume: false // Désactiver le volume inline pour de meilleures performances
+            inlineVolume: false
         });
 
         connection.subscribe(player);
         player.play(resource);
 
-        // Envoyer un message stylisé dans le canal texte
         if (textChannel && textChannel.permissionsFor && textChannel.permissionsFor(textChannel.client.user)?.has(['ViewChannel', 'SendMessages'])) {
             const embed = createEmbed(
                 `${EMOJIS.nowPlaying} Lecture en cours`,
@@ -444,7 +325,6 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        // Defer IMMÉDIATEMENT
         try {
             await interaction.deferReply();
         } catch (error) {
@@ -453,7 +333,6 @@ module.exports = {
         }
 
         try {
-            // Vérifier si l'utilisateur est dans un salon vocal
             const voiceChannel = interaction.member.voice.channel;
             if (!voiceChannel) {
                 return await interaction.editReply('❌ Tu dois être dans un salon vocal !');
@@ -463,16 +342,12 @@ module.exports = {
             
             await interaction.editReply('🔍 Recherche en cours...');
 
-            console.log('Query reçue:', query);
-
-            // Vérifier si c'est un lien Spotify
             let videoUrl;
             let songTitle;
             let songDuration;
             let spotifyTracks = [];
             
             if (query.includes('spotify.com')) {
-                console.log('Détection d\'un lien Spotify');
                 const spotifyInfo = extractSpotifyInfo(query);
                 
                 if (!spotifyInfo) {
@@ -481,15 +356,11 @@ module.exports = {
                 
                 try {
                     if (spotifyInfo.type === 'track') {
-                        // Track individuelle
                         const spotifyTrack = await getSpotifyTrackInfo(spotifyInfo.id);
-                        console.log('Info Spotify récupérée:', spotifyTrack.title);
                         spotifyTracks.push(spotifyTrack);
                     } else if (spotifyInfo.type === 'playlist') {
-                        // Playlist
                         await interaction.editReply('📋 Récupération de la playlist Spotify...');
                         spotifyTracks = await getSpotifyPlaylistTracks(spotifyInfo.id);
-                        console.log(`Playlist Spotify récupérée: ${spotifyTracks.length} chansons`);
                         
                         if (spotifyTracks.length === 0) {
                             return await interaction.editReply('❌ La playlist est vide ou ne contient que des tracks locales.');
@@ -497,10 +368,8 @@ module.exports = {
                         
                         await interaction.editReply(`📋 Ajout de ${spotifyTracks.length} chansons à la file d'attente...`);
                     } else if (spotifyInfo.type === 'album') {
-                        // Album
                         await interaction.editReply('💿 Récupération de l\'album Spotify...');
                         spotifyTracks = await getSpotifyAlbumTracks(spotifyInfo.id);
-                        console.log(`Album Spotify récupéré: ${spotifyTracks.length} chansons`);
                         
                         if (spotifyTracks.length === 0) {
                             return await interaction.editReply('❌ L\'album est vide.');
@@ -509,14 +378,12 @@ module.exports = {
                         await interaction.editReply(`💿 Ajout de ${spotifyTracks.length} chansons à la file d'attente...`);
                     }
                     
-                    // Traiter chaque track Spotify
                     const queue = queues.get(interaction.guildId) || [];
                     const isPlaying = players.has(interaction.guildId);
                     let addedCount = 0;
                     
                     for (const spotifyTrack of spotifyTracks) {
                         try {
-                            // Rechercher l'équivalent sur YouTube avec cache
                             const searchQuery = spotifyTrack.title;
                             const videoUrl = await searchYouTube(searchQuery);
                             
@@ -534,16 +401,12 @@ module.exports = {
                                 
                                 queue.push(song);
                                 addedCount++;
-                                console.log(`Ajouté: ${spotifyTrack.title}`);
-                            } else {
-                                console.log(`Introuvable sur YouTube: ${spotifyTrack.title}`);
                             }
                         } catch (error) {
                             console.error(`Erreur pour ${spotifyTrack.title}:`, error);
                         }
                     }
                     
-                    // Initialiser la queue si nécessaire
                     if (!queues.has(interaction.guildId)) {
                         queues.set(interaction.guildId, queue);
                     }
@@ -564,7 +427,6 @@ module.exports = {
                 } catch (error) {
                     console.error('Erreur Spotify:', error);
                     
-                    // Message d'erreur plus explicite
                     let errorMessage = '❌ Erreur lors de la récupération des informations Spotify.';
                     if (error.message.includes('publique') || error.message.includes('privée') || error.message.includes('introuvable')) {
                         errorMessage = `❌ ${error.message}`;
@@ -573,40 +435,31 @@ module.exports = {
                     return await interaction.editReply(errorMessage);
                 }
             } else {
-                // Vérifier le type de lien/recherche YouTube
                 const ytValidate = play.yt_validate(query);
-                
-                console.log('Validation YouTube:', ytValidate);
                 
                 if (ytValidate === 'video') {
                     videoUrl = query;
                 } else if (ytValidate === 'playlist') {
                     return await interaction.editReply('❌ Les playlists YouTube ne sont pas encore supportées.');
                 } else {
-                    // Recherche YouTube avec cache
                     videoUrl = await searchYouTube(query);
-                    console.log('Résultats de recherche:', videoUrl ? 'trouvé' : 'non trouvé');
                     if (!videoUrl) {
                         return await interaction.editReply('❌ Aucun résultat trouvé.');
                     }
                 }
             }
 
-            console.log('URL vidéo finale:', videoUrl);
-
-            // Obtenir les informations avec play-dl pour le titre (si pas déjà récupéré depuis Spotify)
             if (!songTitle) {
                 let video;
                 try {
                     const videoInfo = await play.video_info(videoUrl);
                     video = videoInfo.video_details;
-                    console.log('Video info récupérée:', video.title);
                 } catch (error) {
                     console.error('Erreur lors de la récupération des infos:', error);
                     video = { title: 'Vidéo YouTube', durationInSec: 0, url: videoUrl };
                 }
 
-                // Formater la durée
+
                 const duration = video.durationInSec || 0;
                 const minutes = Math.floor(duration / 60);
                 const seconds = duration % 60;
@@ -614,7 +467,6 @@ module.exports = {
                 songTitle = video.title;
             }
 
-            // Créer l'objet chanson
             const song = {
                 title: songTitle,
                 url: videoUrl,
@@ -622,7 +474,6 @@ module.exports = {
                 requester: interaction.user.tag
             };
 
-            // Initialiser la queue si elle n'existe pas
             if (!queues.has(interaction.guildId)) {
                 queues.set(interaction.guildId, []);
             }
@@ -630,10 +481,9 @@ module.exports = {
             const queue = queues.get(interaction.guildId);
             const isPlaying = players.has(interaction.guildId);
 
-            // Ajouter la chanson à la queue
             queue.push(song);
+
             if (isPlaying) {
-                // Si une musique est déjà en cours, juste ajouter à la queue
                 const embed = createEmbed(
                     `${EMOJIS.play} Ajouté à la file`,
                     `**${song.title}**\n\n${EMOJIS.music} Durée: \`${song.duration}\`\n📍 Position: **${queue.length}**`,
@@ -641,7 +491,6 @@ module.exports = {
                 );
                 await interaction.editReply({ embeds: [embed] });
             } else {
-                // Si rien n'est en cours, démarrer la lecture
                 const embed = createEmbed(
                     `${EMOJIS.fire} Démarrage de la lecture`,
                     `Harmonia va jouer **${song.title}** ${EMOJIS.sparkles}`,
@@ -660,7 +509,6 @@ module.exports = {
         }
     },
     
-    // Exporter les fonctions pour accéder au player et à la queue
     getPlayer,
     getQueue,
     getCurrentSong,

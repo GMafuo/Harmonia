@@ -45,12 +45,3 @@ module.exports = {
         }
     }
 };
-
-        } catch (error) {
-            console.error('Erreur lors du shuffle:', error);
-            if (interaction.deferred && !interaction.replied) {
-                await interaction.editReply('❌ Une erreur est survenue lors du mélange !').catch(console.error);
-            }
-        }
-    }
-};
