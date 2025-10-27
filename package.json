@@ -4,9 +4,9 @@
   "description": "Un bot musical Discord intelligent",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "bash start.sh",
     "deploy-commands": "node src/deploy-commands.js",
-    "postinstall": "bash install-yt-dlp.sh || echo 'Installation yt-dlp ignorée sur Windows'"
+    "postinstall": "bash install-deps.sh || echo 'Installation des dépendances système ignorée'"
   },
   "keywords": [],
   "author": "",
