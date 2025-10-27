@@ -215,7 +215,10 @@ async function preloadNextSong(guildId) {
     console.log('Préchargement de:', nextSong.title);
     
     try {
-        const ytdlpPath = process.env.LOCALAPPDATA + '\\Microsoft\\WinGet\\Packages\\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\\yt-dlp.exe';
+        // Détecter le chemin de yt-dlp selon l'OS
+        const ytdlpPath = process.platform === 'win32' 
+            ? process.env.LOCALAPPDATA + '\\Microsoft\\WinGet\\Packages\\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\\yt-dlp.exe'
+            : 'yt-dlp'; // Sur Linux (Render), yt-dlp est dans le PATH
         
         // Lancer yt-dlp en arrière-plan pour mettre en cache
         const ytdlpProcess = spawn(ytdlpPath, [
@@ -277,8 +280,10 @@ async function playNext(guildId, voiceChannel, textChannel) {
             preloadingProcesses.delete(guildId);
         }
         
-        // Créer le stream avec yt-dlp
-        const ytdlpPath = process.env.LOCALAPPDATA + '\\Microsoft\\WinGet\\Packages\\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\\yt-dlp.exe';
+        // Détecter le chemin de yt-dlp selon l'OS
+        const ytdlpPath = process.platform === 'win32' 
+            ? process.env.LOCALAPPDATA + '\\Microsoft\\WinGet\\Packages\\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\\yt-dlp.exe'
+            : 'yt-dlp'; // Sur Linux (Render), yt-dlp est dans le PATH
         
         const ytdlpProcess = spawn(ytdlpPath, [
             '-f', 'bestaudio',
