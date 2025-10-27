@@ -4,8 +4,6 @@ const path = require('path');
 require('dotenv').config();
 
 const commands = [];
-
-// Charger toutes les commandes depuis le dossier commands/music
 const commandsPath = path.join(__dirname, 'commands', 'music');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
@@ -17,7 +15,7 @@ for (const file of commandFiles) {
         commands.push(command.data.toJSON());
         console.log(`Chargé: ${command.data.name}`);
     } else {
-        console.log(`[ATTENTION] La commande ${filePath} n'a pas les propriétés "data" ou "execute" requises.`);
+        console.log(`[ATTENTION] La commande ${filePath} manque "data" ou "execute".`);
     }
 }
 

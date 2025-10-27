@@ -11,13 +11,10 @@ module.exports = {
         try {
             await interaction.deferReply();
 
-            // Vérifier si l'utilisateur est dans un salon vocal
-            const voiceChannel = interaction.member.voice.channel;
-            if (!voiceChannel) {
+            if (!interaction.member.voice.channel) {
                 return await interaction.editReply('❌ Tu dois être dans un salon vocal !');
             }
 
-            // Récupérer la queue
             const queue = playCommand.getQueue(interaction.guildId);
 
             if (!queue || queue.length === 0) {
@@ -25,8 +22,6 @@ module.exports = {
             }
 
             const count = queue.length;
-            
-            // Vider la queue
             queue.length = 0;
 
             const embed = createEmbed(
@@ -36,6 +31,14 @@ module.exports = {
             );
 
             await interaction.editReply({ embeds: [embed] });
+        } catch (error) {
+            console.error('Erreur lors du clear:', error);
+            if (interaction.deferred && !interaction.replied) {
+                await interaction.editReply('❌ Une erreur est survenue lors du nettoyage !').catch(console.error);
+            }
+        }
+    }
+};
 
         } catch (error) {
             console.error('Erreur lors du clear:', error);

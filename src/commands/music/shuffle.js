@@ -11,13 +11,10 @@ module.exports = {
         try {
             await interaction.deferReply();
 
-            // Vérifier si l'utilisateur est dans un salon vocal
-            const voiceChannel = interaction.member.voice.channel;
-            if (!voiceChannel) {
+            if (!interaction.member.voice.channel) {
                 return await interaction.editReply('❌ Tu dois être dans un salon vocal !');
             }
 
-            // Récupérer la queue
             const queue = playCommand.getQueue(interaction.guildId);
 
             if (!queue || queue.length === 0) {
@@ -28,7 +25,6 @@ module.exports = {
                 return await interaction.editReply('❌ Il n\'y a qu\'une seule chanson dans la file d\'attente !');
             }
 
-            // Algorithme de Fisher-Yates pour mélanger
             for (let i = queue.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [queue[i], queue[j]] = [queue[j], queue[i]];
@@ -41,6 +37,14 @@ module.exports = {
             );
 
             await interaction.editReply({ embeds: [embed] });
+        } catch (error) {
+            console.error('Erreur lors du shuffle:', error);
+            if (interaction.deferred && !interaction.replied) {
+                await interaction.editReply('❌ Une erreur est survenue lors du mélange !').catch(console.error);
+            }
+        }
+    }
+};
 
         } catch (error) {
             console.error('Erreur lors du shuffle:', error);

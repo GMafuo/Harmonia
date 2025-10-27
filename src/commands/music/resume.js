@@ -1,6 +1,4 @@
 const { SlashCommandBuilder } = require('discord.js');
-
-// Importer la Map des players depuis play.js
 const playCommand = require('./play.js');
 
 module.exports = {
@@ -10,7 +8,6 @@ module.exports = {
 
     async execute(interaction) {
         try {
-            // Vérifier si l'utilisateur est dans un salon vocal
             if (!interaction.member.voice.channel) {
                 return await interaction.reply({
                     content: '❌ Tu dois être dans un salon vocal !',

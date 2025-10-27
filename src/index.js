@@ -14,10 +14,8 @@ const client = new Client({
     ]
 });
 
-// Collection pour stocker les commandes
 client.commands = new Collection();
 
-// Charge les commandes
 const commandsPath = path.join(__dirname, 'commands/music');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
@@ -56,7 +54,6 @@ client.once('ready', () => {
     console.log(`🎵 Harmonia est en ligne en tant que ${client.user.tag}`);
 });
 
-// Gestion des erreurs non gérées
 process.on('unhandledRejection', error => {
     console.error('Erreur non gérée:', error);
 });

@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const playCommand = require('./play.js');
-const { createQueueEmbed, EMOJIS } = require('../../utils/embedStyles');
+const { createQueueEmbed } = require('../../utils/embedStyles');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -20,7 +20,6 @@ module.exports = {
             }
 
             const embed = createQueueEmbed(queue || [], currentSong);
-
             await interaction.reply({ embeds: [embed] });
         } catch (error) {
             console.error('Erreur lors de l\'affichage de la queue:', error);

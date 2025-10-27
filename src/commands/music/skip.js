@@ -1,7 +1,4 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { AudioPlayerStatus } = require('@discordjs/voice');
-
-// Importer les fonctions depuis play.js
 const playCommand = require('./play.js');
 
 module.exports = {
@@ -11,7 +8,6 @@ module.exports = {
 
     async execute(interaction) {
         try {
-            // Vérifier si l'utilisateur est dans un salon vocal
             if (!interaction.member.voice.channel) {
                 return await interaction.reply({
                     content: '❌ Tu dois être dans un salon vocal !',
@@ -35,7 +31,7 @@ module.exports = {
                 player.stop();
             } else {
                 await interaction.reply(`⏭️ Chanson passée ! (${queue.length} chanson(s) restante(s))`);
-                player.stop(); // Stop déclenche l'événement Idle qui appelle playNext
+                player.stop();
             }
         } catch (error) {
             console.error('Erreur lors du skip:', error);
