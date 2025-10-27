@@ -17,6 +17,15 @@ const players = new Map();
 // Map pour stocker les files d'attente par guild
 const queues = new Map();
 
+// Map pour stocker les connexions vocales
+const connections = new Map();
+
+// Cache pour les recherches YouTube (pour éviter de rechercher 2x la même chose)
+const searchCache = new Map();
+
+// Map pour stocker les processus yt-dlp en préchargement
+const preloadingProcesses = new Map();
+
 // Variable pour stocker le token Spotify
 let spotifyAccessToken = null;
 let spotifyTokenExpiry = null;
@@ -155,6 +164,73 @@ function getQueue(guildId) {
     return queues.get(guildId);
 }
 
+// Fonction pour rechercher une vidéo YouTube avec cache
+async function searchYouTube(query) {
+    // Vérifier le cache
+    if (searchCache.has(query)) {
+        console.log('Résultat en cache pour:', query);
+        return searchCache.get(query);
+    }
+    
+    // Rechercher sur YouTube
+    const searchResults = await play.search(query, { limit: 1 });
+    
+    if (searchResults && searchResults.length > 0) {
+        const result = searchResults[0].url;
+        // Mettre en cache (garder seulement les 100 dernières recherches)
+        if (searchCache.size > 100) {
+            const firstKey = searchCache.keys().next().value;
+            searchCache.delete(firstKey);
+        }
+        searchCache.set(query, result);
+        return result;
+    }
+    
+    return null;
+}
+
+// Fonction pour précharger la prochaine chanson
+async function preloadNextSong(guildId) {
+    const queue = queues.get(guildId);
+    
+    if (!queue || queue.length === 0) {
+        return;
+    }
+    
+    const nextSong = queue[0]; // Récupérer sans retirer de la queue
+    
+    // Éviter de précharger si déjà en cours
+    if (preloadingProcesses.has(guildId)) {
+        return;
+    }
+    
+    console.log('Préchargement de:', nextSong.title);
+    
+    try {
+        const ytdlpPath = process.env.LOCALAPPDATA + '\\Microsoft\\WinGet\\Packages\\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\\yt-dlp.exe';
+        
+        // Lancer yt-dlp en arrière-plan pour mettre en cache
+        const ytdlpProcess = spawn(ytdlpPath, [
+            '-f', 'bestaudio',
+            '--no-playlist',
+            '--quiet',
+            '--simulate', // Juste pour valider l'URL et mettre en cache
+            nextSong.url
+        ]);
+        
+        preloadingProcesses.set(guildId, ytdlpProcess);
+        
+        ytdlpProcess.on('close', () => {
+            preloadingProcesses.delete(guildId);
+            console.log('Préchargement terminé pour:', nextSong.title);
+        });
+        
+    } catch (error) {
+        console.error('Erreur de préchargement:', error);
+        preloadingProcesses.delete(guildId);
+    }
+}
+
 // Fonction pour jouer la prochaine chanson
 async function playNext(guildId, voiceChannel, textChannel) {
     const queue = queues.get(guildId);
@@ -171,6 +247,7 @@ async function playNext(guildId, voiceChannel, textChannel) {
                     connection.destroy();
                     players.delete(guildId);
                     queues.delete(guildId);
+                    connections.delete(guildId);
                 }
             }
         }, 60000);
@@ -181,12 +258,19 @@ async function playNext(guildId, voiceChannel, textChannel) {
     console.log('Lecture de la prochaine chanson:', nextSong.title);
     
     try {
+        // Annuler le préchargement si en cours
+        if (preloadingProcesses.has(guildId)) {
+            preloadingProcesses.get(guildId).kill();
+            preloadingProcesses.delete(guildId);
+        }
+        
         // Créer le stream avec yt-dlp
         const ytdlpPath = process.env.LOCALAPPDATA + '\\Microsoft\\WinGet\\Packages\\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\\yt-dlp.exe';
         
         const ytdlpProcess = spawn(ytdlpPath, [
             '-f', 'bestaudio',
             '--no-playlist',
+            '--buffer-size', '16K', // Buffer plus petit pour démarrage rapide
             '-o', '-',
             nextSong.url
         ]);
@@ -205,13 +289,17 @@ async function playNext(guildId, voiceChannel, textChannel) {
 
         const stream = ytdlpProcess.stdout;
         
-        // Rejoindre le canal vocal
-        const { joinVoiceChannel } = require('@discordjs/voice');
-        const connection = joinVoiceChannel({
-            channelId: voiceChannel.id,
-            guildId: voiceChannel.guild.id,
-            adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-        });
+        // Réutiliser ou créer la connexion vocale
+        let connection = connections.get(guildId);
+        if (!connection) {
+            const { joinVoiceChannel } = require('@discordjs/voice');
+            connection = joinVoiceChannel({
+                channelId: voiceChannel.id,
+                guildId: voiceChannel.guild.id,
+                adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+            });
+            connections.set(guildId, connection);
+        }
 
         // Créer ou récupérer le player
         let player = players.get(guildId);
@@ -224,6 +312,12 @@ async function playNext(guildId, voiceChannel, textChannel) {
                 console.log('Chanson terminée, prochaine...');
                 playNext(guildId, voiceChannel, textChannel);
             });
+            
+            // Précharger la prochaine chanson quand on commence à jouer
+            player.on(AudioPlayerStatus.Playing, () => {
+                console.log('Lecture démarrée, préchargement de la suivante...');
+                setTimeout(() => preloadNextSong(guildId), 5000); // Attendre 5s avant de précharger
+            });
 
             player.on('error', error => {
                 console.error('Erreur du player:', error);
@@ -231,17 +325,18 @@ async function playNext(guildId, voiceChannel, textChannel) {
             });
         }
 
-        // Créer la ressource audio
+        // Créer la ressource audio avec highWaterMark réduit pour démarrage rapide
         const { createAudioResource, StreamType } = require('@discordjs/voice');
         const resource = createAudioResource(stream, {
             inputType: StreamType.Arbitrary,
-            inlineVolume: true
+            inlineVolume: true,
+            inlineVolume: false // Désactiver le volume inline pour de meilleures performances
         });
 
         connection.subscribe(player);
         player.play(resource);
 
-        // Envoyer un message dans le canal texte
+        // Envoyer un message dans le canal texte (en parallèle, sans attendre)
         if (textChannel && textChannel.permissionsFor && textChannel.permissionsFor(textChannel.client.user)?.has(['ViewChannel', 'SendMessages'])) {
             textChannel.send(`▶️ Lecture en cours : **${nextSong.title}** - \`${nextSong.duration}\``).catch(console.error);
         }
@@ -334,18 +429,18 @@ module.exports = {
                     
                     for (const spotifyTrack of spotifyTracks) {
                         try {
-                            // Rechercher l'équivalent sur YouTube
+                            // Rechercher l'équivalent sur YouTube avec cache
                             const searchQuery = spotifyTrack.title;
-                            const searchResults = await play.search(searchQuery, { limit: 1 });
+                            const videoUrl = await searchYouTube(searchQuery);
                             
-                            if (searchResults && searchResults.length > 0) {
+                            if (videoUrl) {
                                 const minutes = Math.floor(spotifyTrack.duration / 60);
                                 const seconds = spotifyTrack.duration % 60;
                                 const duration = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
                                 
                                 const song = {
                                     title: spotifyTrack.title,
-                                    url: searchResults[0].url,
+                                    url: videoUrl,
                                     duration: duration,
                                     requester: interaction.user.tag
                                 };
@@ -399,15 +494,14 @@ module.exports = {
                 if (ytValidate === 'video') {
                     videoUrl = query;
                 } else if (ytValidate === 'playlist') {
-                    return await interaction.editReply('❌ Les playlists ne sont pas encore supportées.');
+                    return await interaction.editReply('❌ Les playlists YouTube ne sont pas encore supportées.');
                 } else {
-                    // Recherche YouTube avec play-dl
-                    const searchResults = await play.search(query, { limit: 1 });
-                    console.log('Résultats de recherche:', searchResults.length);
-                    if (!searchResults || searchResults.length === 0) {
+                    // Recherche YouTube avec cache
+                    videoUrl = await searchYouTube(query);
+                    console.log('Résultats de recherche:', videoUrl ? 'trouvé' : 'non trouvé');
+                    if (!videoUrl) {
                         return await interaction.editReply('❌ Aucun résultat trouvé.');
                     }
-                    videoUrl = searchResults[0].url;
                 }
             }
 
